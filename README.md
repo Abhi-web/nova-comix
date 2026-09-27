@@ -1,4 +1,4 @@
-![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215605.png))
+![Home Page](https://github.com/Abhi-web/nova-comix/blob/885e12f0499300c91a175727e3a8353aa4fddb39/Screenshot%202026-09-27%20215747.png)
 ![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215638.png))
 ![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215703.png))
 ![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215717.png))
