@@ -1,3 +1,9 @@
+![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215605.png))
+![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215638.png))
+![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215703.png))
+![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215717.png))
+![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215728.png))
+![Home Page]([https://raw.githubusercontent.com/Abhi-web/nova-comix/main/screenshots/home.png](https://github.com/Abhi-web/nova-comix/blob/main/Screenshot%202026-09-27%20215747.png))
 # 🌟 NOVA COMIX
 
 ### Manga & Comic Web Reader + Admin CMS
