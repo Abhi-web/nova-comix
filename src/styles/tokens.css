@@ -1,0 +1,29 @@
+/**
+ * Design Token References for NOVA PANEL
+ * Background: #090A0F
+ * Secondary: #0F1117
+ * Card: #151821
+ * Elevated: #1A1D26
+ * Text Primary: #F5F5F5
+ * Text Secondary: #A1A1AA
+ * Border: #272B35
+ * Accent: #E5A93C (Warm Amber Gold)
+ */
+
+:root {
+  --color-bg-primary: #090A0F;
+  --color-bg-secondary: #0F1117;
+  --color-bg-surface: #12151D;
+  --color-bg-card: #151821;
+  --color-bg-card-hover: #1A1D26;
+  --color-bg-elevated: #1A1D26;
+  --color-text-primary: #F5F5F5;
+  --color-text-secondary: #A1A1AA;
+  --color-text-muted: #71717A;
+  --color-border-subtle: #272B35;
+  --color-border-strong: #373D4B;
+  --color-accent: #E5A93C;
+  --color-accent-hover: #F3B952;
+  --color-accent-muted: rgba(229, 169, 60, 0.12);
+  --color-accent-border: rgba(229, 169, 60, 0.28);
+}
