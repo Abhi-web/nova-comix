@@ -9,24 +9,24 @@ export default {
     extend: {
       colors: {
         background: {
-          primary: '#090A0F',
-          secondary: '#0F1117',
-          surface: '#12151D',
-          card: '#151821',
-          cardHover: '#1A1D26',
-          elevated: '#1A1D26',
-          header: 'rgba(9, 10, 15, 0.88)',
+          primary: '#07090D',
+          secondary: '#0D1016',
+          surface: '#0D1016',
+          card: '#131720',
+          cardHover: '#171C25',
+          elevated: '#171C25',
+          header: 'rgba(7, 9, 13, 0.92)',
         },
         content: {
           primary: '#F5F5F5',
-          secondary: '#A1A1AA',
-          muted: '#71717A',
-          tertiary: '#52525B',
+          secondary: '#A3A7B2',
+          muted: '#7A8090',
+          tertiary: '#555C6D',
         },
         border: {
-          subtle: '#272B35',
-          strong: '#373D4B',
-          card: '#1F232D',
+          subtle: '#252B36',
+          strong: '#363D4E',
+          card: '#1D232F',
         },
         accent: {
           DEFAULT: '#E5A93C',

@@ -4,16 +4,16 @@
 
 @layer base {
   :root {
-    --bg-primary: #090A0F;
-    --bg-secondary: #0F1117;
-    --bg-card: #151821;
-    --bg-card-hover: #1A1D26;
-    --bg-elevated: #1A1D26;
+    --bg-primary: #07090D;
+    --bg-secondary: #0D1016;
+    --bg-card: #131720;
+    --bg-card-hover: #171C25;
+    --bg-elevated: #171C25;
     --text-primary: #F5F5F5;
-    --text-secondary: #A1A1AA;
-    --text-muted: #71717A;
-    --border-subtle: #272B35;
-    --border-strong: #373D4B;
+    --text-secondary: #A3A7B2;
+    --text-muted: #7A8090;
+    --border-subtle: #252B36;
+    --border-strong: #363D4E;
     --accent: #E5A93C;
     --accent-hover: #F3B952;
   }
@@ -39,16 +39,16 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #090A0F;
+    background: #07090D;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #272B35;
+    background: #252B36;
     border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #373D4B;
+    background: #363D4E;
   }
 }
 
@@ -67,46 +67,74 @@
     text-wrap: balance;
   }
 
-  /* Cinematic Scrims & Atmospheric Glows */
+  /* Cinematic Scrims & Atmospheric Gradients */
   .cinema-scrim-b {
-    background: linear-gradient(180deg, rgba(9, 10, 15, 0) 0%, rgba(9, 10, 15, 0.7) 60%, #090A0F 100%);
+    background: linear-gradient(180deg, rgba(7, 9, 13, 0) 0%, rgba(7, 9, 13, 0.72) 60%, #07090D 100%);
   }
 
   .card-scrim-b {
-    background: linear-gradient(180deg, rgba(21, 24, 33, 0) 0%, rgba(21, 24, 33, 0.6) 45%, #151821 100%);
+    background: linear-gradient(180deg, rgba(19, 23, 32, 0) 0%, rgba(19, 23, 32, 0.7) 50%, #131720 100%);
   }
 
   .cinema-scrim-t {
-    background: linear-gradient(0deg, rgba(9, 10, 15, 0) 0%, rgba(9, 10, 15, 0.8) 100%);
+    background: linear-gradient(0deg, rgba(7, 9, 13, 0) 0%, rgba(7, 9, 13, 0.82) 100%);
   }
 
   .text-gradient-gold {
-    background: linear-gradient(135deg, #FFF7ED 0%, #F59E0B 50%, #D97706 100%);
+    background: linear-gradient(135deg, #FFFBEB 0%, #F59E0B 50%, #D97706 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
 
   .editorial-glass {
-    background: rgba(18, 21, 29, 0.72);
+    background: rgba(13, 16, 22, 0.82);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
-  /* Cinematic Hero Slider Animations */
-  @keyframes heroSlowZoom {
+  /* ==============================================================
+     DUAL HERO SLIDER ANIMATION SYSTEM
+     Type A: Cinematic Zoom + Crossfade
+     Type B: Directional Parallax Slide
+     ============================================================== */
+
+  /* --- ANIMATION TYPE A KEYFRAMES --- */
+  @keyframes heroFadeOutZoom {
     0% {
-      transform: scale(1.00) translateZ(0);
+      opacity: 1;
+      transform: scale(1.02);
     }
     100% {
-      transform: scale(1.035) translateZ(0);
+      opacity: 0;
+      transform: scale(1.05);
     }
   }
 
-  @keyframes heroContentSlideUp {
+  @keyframes heroFadeInScaleDown {
     0% {
       opacity: 0;
-      transform: translateY(15px);
+      transform: scale(1.03);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1.00);
+    }
+  }
+
+  @keyframes heroKenBurnsSlow {
+    0% {
+      transform: scale(1.00);
+    }
+    100% {
+      transform: scale(1.035);
+    }
+  }
+
+  @keyframes heroContentFadeUpA {
+    0% {
+      opacity: 0;
+      transform: translateY(12px);
     }
     100% {
       opacity: 1;
@@ -114,12 +142,134 @@
     }
   }
 
-  .animate-hero-zoom {
-    animation: heroSlowZoom 6.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  /* --- ANIMATION TYPE B KEYFRAMES (DIRECTIONAL PARALLAX) --- */
+  /* When moving Next: current BG moves slightly left, next enters from right */
+  @keyframes heroParallaxBgExitNext {
+    0% {
+      opacity: 1;
+      transform: translateX(0%);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-2.5%);
+    }
   }
 
-  .animate-hero-content {
-    animation: heroContentSlideUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  @keyframes heroParallaxBgEnterNext {
+    0% {
+      opacity: 0;
+      transform: translateX(2.5%);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0%);
+    }
+  }
+
+  /* When moving Prev: current BG moves slightly right, next enters from left */
+  @keyframes heroParallaxBgExitPrev {
+    0% {
+      opacity: 1;
+      transform: translateX(0%);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(2.5%);
+    }
+  }
+
+  @keyframes heroParallaxBgEnterPrev {
+    0% {
+      opacity: 0;
+      transform: translateX(-2.5%);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0%);
+    }
+  }
+
+  /* Content Parallax (moves at distinct speed: ~20px with subtle vertical component) */
+  @keyframes heroContentParallaxFromRight {
+    0% {
+      opacity: 0;
+      transform: translateX(20px) translateY(4px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0) translateY(0);
+    }
+  }
+
+  @keyframes heroContentParallaxFromLeft {
+    0% {
+      opacity: 0;
+      transform: translateX(-20px) translateY(4px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0) translateY(0);
+    }
+  }
+
+  /* Simple fallback animations for reduced motion */
+  @keyframes heroSimpleFadeIn {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes heroSimpleFadeOut {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* --- DUAL ANIMATION UTILITY CLASSES --- */
+  .hero-exit-a {
+    animation: heroFadeOutZoom 750ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .hero-enter-a {
+    animation: heroFadeInScaleDown 750ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .hero-kenburns {
+    animation: heroKenBurnsSlow 6.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  }
+
+  .hero-content-a {
+    animation: heroContentFadeUpA 550ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .hero-exit-b-next {
+    animation: heroParallaxBgExitNext 750ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+
+  .hero-enter-b-next {
+    animation: heroParallaxBgEnterNext 750ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+
+  .hero-exit-b-prev {
+    animation: heroParallaxBgExitPrev 750ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+
+  .hero-enter-b-prev {
+    animation: heroParallaxBgEnterPrev 750ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+
+  .hero-content-b-next {
+    animation: heroContentParallaxFromRight 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .hero-content-b-prev {
+    animation: heroContentParallaxFromLeft 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   /* Refined subtle scrollbar for panels */
@@ -130,25 +280,39 @@
     background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #1F232D;
+    background: #1D232F;
     border-radius: 9999px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #2D3342;
+    background: #2D3546;
   }
   .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: #1F232D transparent;
+    scrollbar-color: #1D232F transparent;
   }
 
+  /* Accessibility: Prefers Reduced Motion */
   @media (prefers-reduced-motion: reduce) {
-    .animate-hero-zoom {
+    .hero-exit-a,
+    .hero-exit-b-next,
+    .hero-exit-b-prev {
+      animation: heroSimpleFadeOut 400ms ease forwards !important;
+      transform: none !important;
+    }
+    .hero-enter-a,
+    .hero-enter-b-next,
+    .hero-enter-b-prev {
+      animation: heroSimpleFadeIn 400ms ease forwards !important;
+      transform: none !important;
+    }
+    .hero-kenburns {
       animation: none !important;
       transform: scale(1) !important;
     }
-    .animate-hero-content {
-      animation: none !important;
-      opacity: 1 !important;
+    .hero-content-a,
+    .hero-content-b-next,
+    .hero-content-b-prev {
+      animation: heroSimpleFadeIn 400ms ease forwards !important;
       transform: none !important;
     }
   }

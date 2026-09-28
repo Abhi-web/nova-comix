@@ -52,10 +52,10 @@ export default function HeroPopularPanel({
   return (
     <aside
       aria-label="Popular Series Leaderboard"
-      className={`relative rounded-3xl bg-[#11131A] border border-border-card shadow-2xl p-4 sm:p-5 flex flex-col justify-between overflow-hidden ${className}`}
+      className={`relative rounded-3xl bg-[#0D1016] border border-border-subtle shadow-2xl p-4 sm:p-5 flex flex-col justify-between overflow-hidden ${className}`}
     >
       {/* Top Header & Tabs Section */}
-      <div className="shrink-0 space-y-3 pb-3 border-b border-border-subtle/70">
+      <div className="shrink-0 space-y-3 pb-3 border-b border-border-subtle/80">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-7 h-7 rounded-lg bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-glow-sm">
@@ -82,7 +82,7 @@ export default function HeroPopularPanel({
         <div
           role="tablist"
           aria-label="Popularity timeframes"
-          className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-[#090A0F]/80 border border-white/5"
+          className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-[#07090D]/80 border border-white/5"
         >
           {tabs.map((tab) => {
             const isActive = activePeriod === tab.id;
@@ -123,7 +123,7 @@ export default function HeroPopularPanel({
             <Link
               key={mangaId}
               to={`/manga/${mangaId}`}
-              className="group relative flex items-center gap-3 p-2 sm:p-2.5 rounded-2xl bg-[#151821]/70 hover:bg-[#1A1D26] border border-border-card/60 hover:border-accent/40 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="group relative flex items-center gap-3 p-2 sm:p-2.5 rounded-2xl bg-[#131720]/80 hover:bg-[#171C25] border border-border-card/60 hover:border-accent/40 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
               aria-label={`Rank ${rank}: ${manga.title}`}
             >
               {/* Rank Number Badge */}
@@ -184,7 +184,7 @@ export default function HeroPopularPanel({
                   {manga.rating && (
                     <span className="flex items-center gap-0.5 font-bold text-accent">
                       <Star className="w-3 h-3 fill-accent text-accent" />
-                      {formatRating(manga.rating)}
+                      ★ {formatRating(manga.rating)}
                     </span>
                   )}
 
@@ -224,7 +224,7 @@ export default function HeroPopularPanel({
           to="/rankings"
           className="text-accent hover:underline font-semibold flex items-center gap-1"
         >
-          View all 28 series
+          {stories.length > 0 ? `View all ${stories.length} series` : "View full rankings"}
         </Link>
       </div>
     </aside>
