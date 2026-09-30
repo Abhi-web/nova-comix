@@ -11,13 +11,19 @@ export const storageService = {
   /**
    * Get relative or absolute stream URL for a file stored in Google Drive
    */
-  getFileAccessUrl(fileId) {
-    if (!fileId) return '';
-    if (fileId.startsWith('http://') || fileId.startsWith('https://') || fileId.startsWith('data:')) {
-      return fileId;
+  getFileAccessUrl(fileIdOrUrl) {
+    if (!fileIdOrUrl) return '';
+    if (
+      fileIdOrUrl.startsWith('http://') ||
+      fileIdOrUrl.startsWith('https://') ||
+      fileIdOrUrl.startsWith('data:') ||
+      fileIdOrUrl.startsWith('blob:')
+    ) {
+      return fileIdOrUrl;
     }
+    const cleanId = fileIdOrUrl.replace(/^\/?api\/reader\/pages\//, '').replace(/^\/+/, '');
     const cleanBase = API_URL.replace(/\/+$/, '');
-    return `${cleanBase}/reader/pages/${fileId}`;
+    return `${cleanBase}/reader/pages/${cleanId}`;
   },
 
   /**

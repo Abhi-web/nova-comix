@@ -177,20 +177,11 @@ export async function uploadChapterPages(req, res, next) {
       });
     }
 
-    // Ensure chapter folder in Drive
-    const chapterFolderId = await googleDriveService.ensureChapterFolder(manga.slug, chapter.number);
-    chapter.driveFolderId = chapterFolderId;
-
-    // Find current highest page number
-    let currentMaxPageNumber = 0;
-    if (Array.isArray(chapter.pages)) {
-      chapter.pages.forEach((p) => {
-        if (p && typeof p.pageNumber === 'number' && p.pageNumber > currentMaxPageNumber) {
-          currentMaxPageNumber = p.pageNumber;
-        }
-      });
-    } else {
-      chapter.pages = [];
+    // Ensure chapter folder in Drive (reuse driveFolderId if already stored to avoid slow folder lookups)
+    let chapterFolderId = chapter.driveFolderId;
+    if (!chapterFolderId) {
+      chapterFolderId = await googleDriveService.ensureChapterFolder(manga.slug, chapter.number);
+      await Chapter.findByIdAndUpdate(chapterId, { driveFolderId: chapterFolderId });
     }
 
     const uploadedPages = [];
@@ -200,34 +191,30 @@ export async function uploadChapterPages(req, res, next) {
     const concurrency = parseInt(process.env.MAX_CONCURRENT_UPLOADS, 10) || 3;
     const queue = [...files];
 
-    let pageCounter = currentMaxPageNumber;
-
     async function worker() {
       while (queue.length > 0) {
         const file = queue.shift();
-        pageCounter += 1;
-        const pageNumber = pageCounter;
         const ext = getSafeExtension(file.mimetype);
-        const fileName = `page-${String(pageNumber).padStart(3, '0')}.${ext}`;
+        const tempFileName = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
 
         try {
           const uploaded = await googleDriveService.uploadFile({
             fileBuffer: file.buffer,
-            fileName,
+            fileName: tempFileName,
             mimeType: file.mimetype,
             parentFolderId: chapterFolderId,
           });
 
           uploadedPages.push({
-            pageNumber,
             fileId: uploaded.fileId,
             imageUrl: storageService.getFileAccessUrl(uploaded.fileId),
-            originalName: file.originalname || fileName,
+            originalName: file.originalname || tempFileName,
             mimeType: uploaded.mimeType,
             fileSize: uploaded.size,
             createdAt: new Date(),
           });
         } catch (uploadErr) {
+          console.error(`Google Drive upload error for ${file.originalname}:`, uploadErr.message);
           failedPages.push({
             originalName: file.originalname,
             error: uploadErr.message,
@@ -239,16 +226,69 @@ export async function uploadChapterPages(req, res, next) {
     const workers = Array.from({ length: Math.min(concurrency, files.length) }, () => worker());
     await Promise.all(workers);
 
-    // Append newly uploaded pages to chapter
-    chapter.pages.push(...uploadedPages);
-    // Sort pages numerically by pageNumber
-    chapter.pages.sort((a, b) => a.pageNumber - b.pageNumber);
-    await chapter.save();
+    // If all files in this batch failed, return explicit error status
+    if (uploadedPages.length === 0 && failedPages.length > 0) {
+      return res.status(500).json({
+        success: false,
+        message: failedPages[0]?.error || 'Failed to upload page(s) to Google Drive',
+        data: {
+          totalUploaded: 0,
+          totalFailed: failedPages.length,
+          failed: failedPages,
+        },
+      });
+    }
+
+    // Safely append to Chapter with retry to eliminate any Mongoose VersionError race conditions
+    let savedChapter = null;
+    let attempts = 0;
+    const MAX_SAVE_ATTEMPTS = 3;
+
+    while (attempts < MAX_SAVE_ATTEMPTS) {
+      attempts++;
+      try {
+        const freshDoc = await Chapter.findById(chapterId);
+        if (!freshDoc) {
+          return res.status(404).json({ success: false, message: 'Chapter not found' });
+        }
+
+        // Determine current max page number dynamically
+        let currentMax = 0;
+        (freshDoc.pages || []).forEach((p) => {
+          if (p && typeof p.pageNumber === 'number' && p.pageNumber > currentMax) {
+            currentMax = p.pageNumber;
+          }
+        });
+
+        // Assign clean sequential page numbers to newly uploaded pages
+        const pagesToAdd = uploadedPages.map((up, idx) => ({
+          ...up,
+          pageNumber: currentMax + idx + 1,
+        }));
+
+        freshDoc.pages.push(...pagesToAdd);
+        freshDoc.pages.sort((a, b) => a.pageNumber - b.pageNumber);
+        if (!freshDoc.driveFolderId) {
+          freshDoc.driveFolderId = chapterFolderId;
+        }
+
+        savedChapter = await freshDoc.save();
+        break; // Successfully saved
+      } catch (saveErr) {
+        if (saveErr.name === 'VersionError' && attempts < MAX_SAVE_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 100 * attempts));
+        } else {
+          throw saveErr;
+        }
+      }
+    }
+
+    const currentPages = savedChapter ? savedChapter.pages : chapter.pages;
 
     res.status(200).json({
       success: true,
       data: {
-        pages: chapter.pages,
+        pages: currentPages,
         totalUploaded: uploadedPages.length,
         totalFailed: failedPages.length,
         failed: failedPages,

@@ -1,5 +1,7 @@
-import express from 'express';
 import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { connectDB } from './config/database.js';
@@ -10,9 +12,6 @@ import chapterRoutes from './routes/chapterRoutes.js';
 import storageRoutes from './routes/storageRoutes.js';
 import adminUploadRoutes from './routes/adminUploadRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorMiddleware.js';
-
-// Load environment variables from backend/.env or root
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

@@ -11,7 +11,7 @@ import {
   getChapters,
   create as createChapterForManga,
 } from '../controllers/chapterController.js';
-import { authMiddleware, adminMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, adminMiddleware, optionalAuthMiddleware } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -29,9 +29,9 @@ router.put('/:id', authMiddleware, adminMiddleware, update);
 router.delete('/:id', authMiddleware, adminMiddleware, remove);
 
 // Nested chapter routes for a manga:
-// GET /api/manga/:mangaId/chapters (public)
+// GET /api/manga/:mangaId/chapters (public + admin preview)
 // POST /api/manga/:mangaId/chapters (admin)
-router.get('/:mangaId/chapters', getChapters);
+router.get('/:mangaId/chapters', optionalAuthMiddleware, getChapters);
 router.post('/:mangaId/chapters', authMiddleware, adminMiddleware, createChapterForManga);
 
 export default router;

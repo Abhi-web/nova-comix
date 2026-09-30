@@ -52,8 +52,34 @@ export async function getChaptersByManga(mangaIdentifier, queryParams = {}) {
   };
 }
 
-export async function getChapterById(chapterId, options = {}) {
-  const chapter = await Chapter.findById(chapterId)
+export async function getChapterById(chapterIdentifier, options = {}) {
+  let query = null;
+
+  if (mongoose.Types.ObjectId.isValid(chapterIdentifier)) {
+    query = Chapter.findById(chapterIdentifier);
+  } else if (typeof chapterIdentifier === 'string' && chapterIdentifier.includes('-ch-')) {
+    const lastDashIndex = chapterIdentifier.lastIndexOf('-ch-');
+    const mangaIdentifier = chapterIdentifier.substring(0, lastDashIndex);
+    const chapterNumberStr = chapterIdentifier.substring(lastDashIndex + 4);
+    const chapterNumber = Number(chapterNumberStr);
+
+    if (!isNaN(chapterNumber)) {
+      try {
+        const mangaId = await resolveMangaId(mangaIdentifier);
+        query = Chapter.findOne({ mangaId, number: chapterNumber });
+      } catch {
+        query = null;
+      }
+    }
+  }
+
+  if (!query) {
+    const error = new Error('Chapter not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const chapter = await query
     .populate('mangaId', 'title slug coverImage type author')
     .lean();
   if (!chapter) {

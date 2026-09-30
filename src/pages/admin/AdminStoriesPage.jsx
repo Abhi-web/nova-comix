@@ -18,6 +18,7 @@ import { useToast } from '../../context/ToastContext';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Skeleton from '../../components/common/Skeleton';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 export default function AdminStoriesPage() {
   const toast = useToast();
@@ -216,7 +217,7 @@ export default function AdminStoriesPage() {
                     {/* Cover */}
                     <td className="py-3 px-4">
                       <img
-                        src={story.coverImage || 'https://via.placeholder.com/60x80'}
+                        src={resolveImageUrl(story.coverImage) || 'https://via.placeholder.com/60x80'}
                         alt={story.title}
                         className="w-10 h-14 object-cover rounded-xl bg-background-elevated border border-border-subtle group-hover:scale-105 transition-transform duration-300"
                       />
@@ -306,7 +307,7 @@ export default function AdminStoriesPage() {
               >
                 <div className="flex items-start gap-3">
                   <img
-                    src={story.coverImage || 'https://via.placeholder.com/60x80'}
+                    src={resolveImageUrl(story.coverImage) || 'https://via.placeholder.com/60x80'}
                     alt={story.title}
                     className="w-14 h-20 object-cover rounded bg-background-elevated border border-border-subtle shrink-0"
                   />

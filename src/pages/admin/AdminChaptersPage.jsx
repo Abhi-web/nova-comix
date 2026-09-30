@@ -17,6 +17,7 @@ import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import Skeleton from '../../components/common/Skeleton';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 export default function AdminChaptersPage() {
   const { id: mangaId } = useParams();
@@ -37,7 +38,7 @@ export default function AdminChaptersPage() {
     try {
       const [storyRes, chaptersRes] = await Promise.all([
         api.get(`/manga/${mangaId}`),
-        chapterService.getByManga(mangaId, { limit: 100, sort: sortOrder }),
+        chapterService.getByManga(mangaId, { limit: 100, sort: sortOrder, status: 'all' }),
       ]);
 
       if (storyRes.success) setStory(storyRes.data);
@@ -128,7 +129,7 @@ export default function AdminChaptersPage() {
         <div className="p-6 rounded-2xl border border-border-subtle bg-background-card/85 backdrop-blur-sm shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <img
-              src={story.coverImage || 'https://via.placeholder.com/60x80'}
+              src={resolveImageUrl(story.coverImage) || 'https://via.placeholder.com/60x80'}
               alt={story.title}
               className="w-14 h-20 object-cover rounded-xl bg-background-elevated border border-border-subtle shrink-0 shadow-card"
             />

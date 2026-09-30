@@ -12,6 +12,8 @@ export async function getChapters(req, res, next) {
     const query = { ...req.query };
     if (isPublic) {
       query.status = 'published';
+    } else if (!query.status) {
+      query.status = 'all'; // Default to all chapters (drafts + published) for Admin
     }
     const result = await getChaptersByManga(req.params.mangaId, query);
     res.status(200).json({

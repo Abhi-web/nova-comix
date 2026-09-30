@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import api from '../../services/api';
 import storageService from '../../services/storageService';
+import { resolveImageUrl } from '../../utils/imageUrl';
 import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
 import LoadingState from '../../components/common/LoadingState';
@@ -326,9 +327,12 @@ export default function AdminStoryFormPage() {
                 {formData.coverImage ? (
                   <div className="w-20 h-28 rounded-xl overflow-hidden border border-border-subtle bg-background-elevated shrink-0 relative group shadow-card">
                     <img
-                      src={formData.coverImage}
+                      src={resolveImageUrl(formData.coverImage)}
                       alt="Cover preview"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = '0.3';
+                      }}
                     />
                   </div>
                 ) : (
@@ -397,9 +401,12 @@ export default function AdminStoryFormPage() {
                 {formData.bannerImage ? (
                   <div className="w-28 h-20 rounded-lg overflow-hidden border border-border-subtle bg-background-elevated shrink-0 relative group">
                     <img
-                      src={formData.bannerImage}
+                      src={resolveImageUrl(formData.bannerImage)}
                       alt="Banner preview"
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = '0.3';
+                      }}
                     />
                   </div>
                 ) : (

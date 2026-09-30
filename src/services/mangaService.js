@@ -1,6 +1,7 @@
 import { MANGA_DATA } from "../data/mangaData";
 import { GENRES_DATA } from "../data/genresData";
 import { generateChaptersForManga } from "../utils/chapterGenerator";
+import { resolveImageUrl } from "../utils/imageUrl";
 import api from "./api";
 
 /**
@@ -22,16 +23,21 @@ export function normalizeManga(item) {
           .toUpperCase()
       : "NP");
 
+  const resolvedCover = resolveImageUrl(item.coverImage || item.cover);
+  const resolvedBanner = resolveImageUrl(
+    item.bannerImage || item.heroArtwork || item.coverImage || item.cover
+  );
+
   return {
     ...item,
     id,
     _id: item._id || id,
     title,
     monogram,
-    cover: item.coverImage || item.cover,
-    coverImage: item.coverImage || item.cover,
-    bannerImage: item.bannerImage || item.heroArtwork || item.coverImage || item.cover,
-    heroArtwork: item.bannerImage || item.heroArtwork || item.coverImage || item.cover,
+    cover: resolvedCover,
+    coverImage: resolvedCover,
+    bannerImage: resolvedBanner,
+    heroArtwork: resolvedBanner,
     type: item.type
       ? item.type.charAt(0).toUpperCase() + item.type.slice(1).toLowerCase()
       : "Manga",
@@ -99,7 +105,7 @@ export const mangaService = {
       if (response.success && Array.isArray(response.data) && response.data.length > 0) {
         return response.data.map((ch) => ({
           ...ch,
-          id: `${mangaId}-ch-${ch.number}`,
+          id: ch._id || `${mangaId}-ch-${ch.number}`,
           formattedDate: ch.publishedAt
             ? new Date(ch.publishedAt).toLocaleDateString()
             : "Recently",

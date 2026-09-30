@@ -19,6 +19,7 @@ import storageService from '../../services/storageService';
 import Skeleton from '../../components/common/Skeleton';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -335,7 +336,7 @@ export default function AdminDashboardPage() {
                 <div key={story._id} className="py-3.5 flex items-center justify-between gap-3 group">
                   <div className="flex items-center gap-3.5 min-w-0">
                     <img
-                      src={story.coverImage || 'https://via.placeholder.com/60x80'}
+                      src={resolveImageUrl(story.coverImage) || 'https://via.placeholder.com/60x80'}
                       alt={story.title}
                       className="w-11 h-14 object-cover rounded-xl bg-background-elevated shrink-0 border border-white/5"
                     />

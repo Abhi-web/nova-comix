@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   UploadCloud,
   Layers,
@@ -8,20 +8,21 @@ import {
   RefreshCw,
   Eye,
   CheckCircle2,
-  AlertTriangle,
   AlertCircle,
   FileImage,
+  FileText,
+  Sparkles,
   X,
   Send,
   FileEdit,
   Loader2,
+  Zap,
 } from 'lucide-react';
 import storageService from '../../services/storageService';
+import { optimizeComicImage } from '../../utils/imageOptimizer';
 import { useToast } from '../../context/ToastContext';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
-
-const MAX_CONCURRENT = 3;
 
 export default function AdminChapterPagesManager({
   chapter,
@@ -30,6 +31,7 @@ export default function AdminChapterPagesManager({
 }) {
   const toast = useToast();
   const fileInputRef = useRef(null);
+  const pdfInputRef = useRef(null);
   const replaceInputRef = useRef(null);
 
   // Pages state from chapter
@@ -41,6 +43,10 @@ export default function AdminChapterPagesManager({
   const [uploadProgress, setUploadProgress] = useState({ total: 0, current: 0, failed: 0 });
   const [cancelUploads, setCancelUploads] = useState(false);
 
+  // PDF Extraction state
+  const [isExtractingPdf, setIsExtractingPdf] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState({ current: 0, total: 0, percent: 0, fileName: '' });
+
   // Single page replacement state
   const [pageToReplace, setPageToReplace] = useState(null);
   const [replacing, setReplacing] = useState(false);
@@ -51,16 +57,96 @@ export default function AdminChapterPagesManager({
   // Publishing / status toggling state
   const [publishing, setPublishing] = useState(false);
 
+  // Handle PDF file selection and automatic page-by-page conversion
+  const handlePdfSelected = async (pdfFile) => {
+    if (!pdfFile) return;
+
+    const isPdf =
+      pdfFile.type === 'application/pdf' ||
+      pdfFile.name.toLowerCase().endsWith('.pdf');
+
+    if (!isPdf) {
+      toast.error('Please select a valid PDF file (.pdf)');
+      return;
+    }
+
+    if (pdfFile.size > 250 * 1024 * 1024) {
+      toast.error('PDF file size is too large (maximum limit is 250MB).');
+      return;
+    }
+
+    setIsExtractingPdf(true);
+    setPdfProgress({
+      current: 0,
+      total: 0,
+      percent: 0,
+      fileName: pdfFile.name,
+    });
+
+    try {
+      toast.info(`Extracting comic pages from "${pdfFile.name}"...`);
+
+      const { extractImagesFromPdf } = await import('../../utils/pdfExtractor');
+
+      const extractedFiles = await extractImagesFromPdf(pdfFile, {
+        targetWidth: 1600,
+        quality: 0.88,
+        onProgress: ({ current, total, percent }) => {
+          setPdfProgress({
+            current,
+            total,
+            percent,
+            fileName: pdfFile.name,
+          });
+        },
+      });
+
+      const queueItems = extractedFiles.map((file, idx) => ({
+        id: `${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+        file,
+        name: file.name,
+        size: file.size,
+        status: 'pending',
+        error: null,
+      }));
+
+      setQueue((prev) => [...prev, ...queueItems]);
+      toast.success(
+        `Successfully extracted ${extractedFiles.length} pages from "${pdfFile.name}"! Click "Start Upload" to send to Cloud Storage.`
+      );
+    } catch (err) {
+      console.error('PDF extraction failed:', err);
+      toast.error(err.message || 'Failed to extract pages from PDF.');
+    } finally {
+      setIsExtractingPdf(false);
+      if (pdfInputRef.current) {
+        pdfInputRef.current.value = '';
+      }
+    }
+  };
+
   // Handle files selected from file picker or drag-and-drop
   const handleFilesSelected = (fileList) => {
-    const validFiles = Array.from(fileList).filter((file) => {
+    const filesArray = Array.from(fileList);
+
+    // If a PDF is included, process the PDF
+    const pdfFile = filesArray.find(
+      (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+    );
+
+    if (pdfFile) {
+      handlePdfSelected(pdfFile);
+      return;
+    }
+
+    const validFiles = filesArray.filter((file) => {
       const isImg = file.type.startsWith('image/');
       const isValidExt = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
       return isImg || isValidExt;
     });
 
     if (validFiles.length === 0) {
-      toast.error('No supported image files found. Please select JPG, PNG, or WEBP images.');
+      toast.error('No supported image or PDF files found. Please select JPG, PNG, WEBP images or a PDF file.');
       return;
     }
 
@@ -69,19 +155,56 @@ export default function AdminChapterPagesManager({
       a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
     );
 
-    const queueItems = validFiles.map((file, idx) => ({
+    const initialQueueItems = validFiles.map((file, idx) => ({
       id: `${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
       file,
       name: file.name,
       size: file.size,
+      originalSize: file.size,
+      wasOptimized: false,
+      isOptimizing: file.size > 500 * 1024,
       status: 'pending',
       error: null,
     }));
 
-    setQueue((prev) => [...prev, ...queueItems]);
+    setQueue((prev) => [...prev, ...initialQueueItems]);
+
+    // Optimize large comic scans (e.g. 3-8MB) in background down to ~350KB HD for 10x faster uploads
+    initialQueueItems.forEach((item) => {
+      if (item.file.size > 500 * 1024) {
+        optimizeComicImage(item.file)
+          .then((res) => {
+            if (res.wasOptimized) {
+              setQueue((prev) =>
+                prev.map((q) =>
+                  q.id === item.id
+                    ? {
+                        ...q,
+                        file: res.file,
+                        size: res.optimizedSize,
+                        originalSize: res.originalSize,
+                        wasOptimized: true,
+                        isOptimizing: false,
+                      }
+                    : q
+                )
+              );
+            } else {
+              setQueue((prev) =>
+                prev.map((q) => (q.id === item.id ? { ...q, isOptimizing: false } : q))
+              );
+            }
+          })
+          .catch(() => {
+            setQueue((prev) =>
+              prev.map((q) => (q.id === item.id ? { ...q, isOptimizing: false } : q))
+            );
+          });
+      }
+    });
   };
 
-  // Start concurrent batch upload
+  // Start rock-solid upload queue (Sequential execution prevents Mongoose version conflicts and Google Drive rate limits)
   const startUpload = async () => {
     if (queue.length === 0) return;
     setIsUploading(true);
@@ -90,50 +213,52 @@ export default function AdminChapterPagesManager({
     const pendingItems = queue.filter((item) => item.status === 'pending' || item.status === 'error');
     setUploadProgress({ total: pendingItems.length, current: 0, failed: 0 });
 
-    let currentIdx = 0;
     let failedCount = 0;
     let successCount = 0;
 
-    const runWorker = async () => {
-      while (currentIdx < pendingItems.length) {
-        if (cancelUploads) break;
+    for (let i = 0; i < pendingItems.length; i++) {
+      if (cancelUploads) break;
+      const item = pendingItems[i];
 
-        const item = pendingItems[currentIdx];
-        currentIdx += 1;
+      // Mark item as uploading
+      setQueue((prev) =>
+        prev.map((q) => (q.id === item.id ? { ...q, status: 'uploading', error: null } : q))
+      );
 
-        // Mark item as uploading
-        setQueue((prev) =>
-          prev.map((q) => (q.id === item.id ? { ...q, status: 'uploading' } : q))
-        );
-
-        try {
-          await storageService.uploadChapterPages(chapter._id, item.file);
-          successCount += 1;
-          setQueue((prev) =>
-            prev.map((q) => (q.id === item.id ? { ...q, status: 'done' } : q))
-          );
-        } catch (err) {
-          failedCount += 1;
-          setQueue((prev) =>
-            prev.map((q) => (q.id === item.id ? { ...q, status: 'error', error: err.message } : q))
-          );
+      try {
+        let fileToUpload = item.file;
+        // On-the-fly optimization if still large
+        if (!item.wasOptimized && fileToUpload.size > 500 * 1024) {
+          const opt = await optimizeComicImage(fileToUpload);
+          if (opt.wasOptimized) {
+            fileToUpload = opt.file;
+          }
         }
 
-        setUploadProgress((prev) => ({
-          ...prev,
-          current: successCount,
-          failed: failedCount,
-        }));
+        await storageService.uploadChapterPages(chapter._id, fileToUpload);
+        successCount += 1;
+        setQueue((prev) =>
+          prev.map((q) => (q.id === item.id ? { ...q, status: 'done', error: null } : q))
+        );
+
+        // Immediately notify parent to update chapter pages view
+        if (onChapterUpdated) {
+          onChapterUpdated();
+        }
+      } catch (err) {
+        failedCount += 1;
+        const errMsg = err.message || 'Upload failed. Check network or storage.';
+        setQueue((prev) =>
+          prev.map((q) => (q.id === item.id ? { ...q, status: 'error', error: errMsg } : q))
+        );
       }
-    };
 
-    // Run MAX_CONCURRENT workers in parallel
-    const workers = Array.from(
-      { length: Math.min(MAX_CONCURRENT, pendingItems.length) },
-      () => runWorker()
-    );
-
-    await Promise.all(workers);
+      setUploadProgress({
+        total: pendingItems.length,
+        current: successCount,
+        failed: failedCount,
+      });
+    }
 
     setIsUploading(false);
     if (onChapterUpdated) {
@@ -142,10 +267,10 @@ export default function AdminChapterPagesManager({
 
     if (failedCount === 0) {
       toast.success(`Successfully uploaded ${successCount} pages.`);
-      // Clear completed queue after 2s
+      // Clear completed queue after 2.5s
       setTimeout(() => {
         setQueue((prev) => prev.filter((q) => q.status !== 'done'));
-      }, 2000);
+      }, 2500);
     } else {
       toast.error(`${successCount} of ${pendingItems.length} uploaded — ${failedCount} failed.`);
     }
@@ -155,6 +280,18 @@ export default function AdminChapterPagesManager({
     setCancelUploads(true);
     setIsUploading(false);
     toast.info('Upload process stopped.');
+  };
+
+  const retryFailed = () => {
+    setQueue((prev) =>
+      prev.map((q) => (q.status === 'error' ? { ...q, status: 'pending', error: null } : q))
+    );
+  };
+
+  const retrySingle = (itemId) => {
+    setQueue((prev) =>
+      prev.map((q) => (q.id === itemId ? { ...q, status: 'pending', error: null } : q))
+    );
   };
 
   const clearQueue = () => {
@@ -324,7 +461,52 @@ export default function AdminChapterPagesManager({
         </div>
       </div>
 
-      {/* Multi-Page Upload Dropzone */}
+      {/* PDF Extraction Progress Banner */}
+      {isExtractingPdf && (
+        <div className="p-6 rounded-2xl border border-accent/40 bg-accent/10 backdrop-blur-md shadow-glow-accent/10 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-accent/20 border border-accent/40 flex items-center justify-center text-accent">
+                <Loader2 className="w-6 h-6 animate-spin text-accent" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-content-primary">
+                    Converting Chapter PDF to HD Pages
+                  </h4>
+                  <span className="inline-flex items-center gap-1 text-[11px] text-accent font-semibold px-2 py-0.5 rounded-full bg-accent/15 border border-accent/25">
+                    <Sparkles className="w-3 h-3" /> HD 1600px
+                  </span>
+                </div>
+                <p className="text-xs text-content-secondary mt-0.5 font-mono truncate max-w-sm">
+                  {pdfProgress.fileName}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-base font-mono font-bold text-accent">
+                {pdfProgress.percent}%
+              </span>
+              <p className="text-[11px] text-content-tertiary">
+                Page {pdfProgress.current} of {pdfProgress.total}
+              </p>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full h-2.5 bg-background-elevated rounded-full overflow-hidden border border-border-subtle">
+            <div
+              className="h-full bg-gradient-to-r from-accent to-pink-500 transition-all duration-200"
+              style={{ width: `${pdfProgress.percent}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-content-tertiary text-center">
+            Extracting panels and formatting pages. Extracted pages will automatically populate your upload queue.
+          </p>
+        </div>
+      )}
+
+      {/* Multi-Page & PDF Upload Dropzone */}
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
@@ -333,9 +515,9 @@ export default function AdminChapterPagesManager({
             handleFilesSelected(e.dataTransfer.files);
           }
         }}
-        onClick={() => fileInputRef.current?.click()}
-        className="p-8 sm:p-10 rounded-2xl border-2 border-dashed border-border-subtle hover:border-accent/70 bg-background-card/50 hover:bg-background-elevated/40 transition-all text-center cursor-pointer group shadow-card"
+        className="p-8 sm:p-10 rounded-2xl border-2 border-dashed border-border-subtle hover:border-accent/70 bg-background-card/50 hover:bg-background-elevated/40 transition-all text-center group shadow-card"
       >
+        {/* Hidden File Input for Multiple Images */}
         <input
           type="file"
           ref={fileInputRef}
@@ -348,15 +530,61 @@ export default function AdminChapterPagesManager({
           }}
           className="hidden"
         />
-        <div className="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent mx-auto mb-3 group-hover:scale-110 transition-transform duration-300 shadow-glow-accent/20">
-          <UploadCloud className="w-7 h-7" />
+
+        {/* Hidden File Input for PDF */}
+        <input
+          type="file"
+          ref={pdfInputRef}
+          accept="application/pdf,.pdf"
+          onChange={(e) => {
+            if (e.target.files?.[0]) {
+              handlePdfSelected(e.target.files[0]);
+            }
+          }}
+          className="hidden"
+        />
+
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="w-13 h-13 p-3 rounded-2xl bg-accent/15 border border-accent/30 text-accent group-hover:scale-105 transition-transform duration-300 shadow-glow-accent/20">
+            <UploadCloud className="w-7 h-7" />
+          </div>
+          <div className="w-13 h-13 p-3 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-400 group-hover:scale-105 transition-transform duration-300">
+            <FileText className="w-7 h-7" />
+          </div>
         </div>
+
         <h3 className="text-base font-bold text-content-primary mb-1">
-          Click or Drag & Drop Chapter Pages
+          Upload Chapter Pages or Entire PDF
         </h3>
-        <p className="text-xs text-content-secondary max-w-md mx-auto leading-relaxed">
-          Select multiple images (JPG, PNG, WEBP). Pages will be uploaded to Google Drive with automated natural sorting.
+        <p className="text-xs text-content-secondary max-w-lg mx-auto leading-relaxed mb-6">
+          Drag & drop your files here, or choose between uploading loose image pages or a complete chapter PDF document (automatically converted to HD pages).
         </p>
+
+        {/* Upload Action Buttons */}
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            disabled={isExtractingPdf || isUploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background-elevated hover:bg-background-card border border-border-subtle hover:border-accent/50 text-content-primary text-xs font-semibold shadow-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+          >
+            <FileImage className="w-4 h-4 text-accent" />
+            <span>Select Images (JPG, PNG, WEBP)</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={isExtractingPdf || isUploading}
+            onClick={() => pdfInputRef.current?.click()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-accent/90 to-purple-600 hover:from-accent hover:to-purple-500 text-white text-xs font-bold shadow-glow-accent/20 hover:shadow-glow-accent/40 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+          >
+            <FileText className="w-4 h-4 text-white" />
+            <span>Upload Chapter PDF</span>
+            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-semibold">
+              Auto Convert
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Active Upload Queue Panel */}
@@ -373,11 +601,17 @@ export default function AdminChapterPagesManager({
             <div className="flex items-center gap-2">
               {!isUploading ? (
                 <>
+                  {queue.some((q) => q.status === 'error') && (
+                    <Button variant="secondary" size="sm" onClick={retryFailed}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                      Retry Failed ({queue.filter((q) => q.status === 'error').length})
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" onClick={clearQueue}>
                     Clear
                   </Button>
                   <Button variant="primary" size="sm" onClick={startUpload}>
-                    Start Upload ({queue.length} Pages)
+                    Start Upload ({queue.filter((q) => q.status !== 'done').length} Pages)
                   </Button>
                 </>
               ) : (
@@ -392,12 +626,15 @@ export default function AdminChapterPagesManager({
           {isUploading && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs text-content-secondary">
-                <span>
-                  Uploading queue with controlled concurrency (Max {MAX_CONCURRENT} at once)...
+                <span className="inline-flex items-center gap-1.5 text-accent font-medium">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Uploading page {Math.min(uploadProgress.current + 1, uploadProgress.total)} of {uploadProgress.total}...
                 </span>
                 <span>
                   {uploadProgress.current} / {uploadProgress.total} Completed{' '}
-                  {uploadProgress.failed > 0 && `(${uploadProgress.failed} Failed)`}
+                  {uploadProgress.failed > 0 && (
+                    <span className="text-rose-400 font-medium">({uploadProgress.failed} Failed)</span>
+                  )}
                 </span>
               </div>
               <div className="w-full h-2 bg-background-elevated rounded-full overflow-hidden">
@@ -418,49 +655,78 @@ export default function AdminChapterPagesManager({
           {/* Queue List Preview */}
           <div className="max-h-60 overflow-y-auto divide-y divide-border-subtle/50 text-xs">
             {queue.map((item) => (
-              <div
-                key={item.id}
-                className="py-2 flex items-center justify-between gap-3 text-content-secondary"
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <FileImage className="w-3.5 h-3.5 text-content-tertiary shrink-0" />
-                  <span className="truncate">{item.name}</span>
-                  <span className="text-[10px] text-content-tertiary shrink-0">
-                    ({Math.round(item.size / 1024)} KB)
-                  </span>
+              <div key={item.id} className="py-2 space-y-1">
+                <div className="flex items-center justify-between gap-3 text-content-secondary">
+                  <div className="flex items-center gap-2 truncate min-w-0">
+                    <FileImage className="w-3.5 h-3.5 text-content-tertiary shrink-0" />
+                    <span className="truncate">{item.name}</span>
+                    <span className="text-[10px] text-content-tertiary shrink-0 font-mono">
+                      ({Math.round(item.size / 1024)} KB)
+                    </span>
+                    {item.wasOptimized && (
+                      <span
+                        className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-0.5"
+                        title={`Original: ${Math.round(item.originalSize / 1024)} KB → Optimized: ${Math.round(item.size / 1024)} KB`}
+                      >
+                        <Zap className="w-2.5 h-2.5" /> HD Fast (-{Math.round((1 - item.size / item.originalSize) * 100)}%)
+                      </span>
+                    )}
+                    {item.isOptimizing && (
+                      <span className="shrink-0 text-[10px] text-accent inline-flex items-center gap-1 font-medium">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" /> Optimizing...
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {item.status === 'pending' && (
+                      <span className="text-content-tertiary text-[11px]">Ready</span>
+                    )}
+                    {item.status === 'uploading' && (
+                      <span className="inline-flex items-center gap-1 text-accent text-[11px] font-medium">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Uploading...
+                      </span>
+                    )}
+                    {item.status === 'done' && (
+                      <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Uploaded
+                      </span>
+                    )}
+                    {item.status === 'error' && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-rose-400 text-[11px]" title={item.error}>
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Failed
+                        </span>
+                        {!isUploading && (
+                          <button
+                            type="button"
+                            onClick={() => retrySingle(item.id)}
+                            className="px-1.5 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-[10px] font-medium"
+                          >
+                            Retry
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {!isUploading && (
+                      <button
+                        onClick={() => setQueue((prev) => prev.filter((q) => q.id !== item.id))}
+                        className="p-1 text-content-tertiary hover:text-rose-400"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {item.status === 'pending' && (
-                    <span className="text-content-tertiary text-[11px]">Ready</span>
-                  )}
-                  {item.status === 'uploading' && (
-                    <span className="inline-flex items-center gap-1 text-accent text-[11px]">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Uploading...
-                    </span>
-                  )}
-                  {item.status === 'done' && (
-                    <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Uploaded
-                    </span>
-                  )}
-                  {item.status === 'error' && (
-                    <span className="inline-flex items-center gap-1 text-rose-400 text-[11px]" title={item.error}>
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      Failed
-                    </span>
-                  )}
-                  {!isUploading && (
-                    <button
-                      onClick={() => setQueue((prev) => prev.filter((q) => q.id !== item.id))}
-                      className="p-1 text-content-tertiary hover:text-rose-400"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+                {item.status === 'error' && item.error && (
+                  <div className="text-[10px] text-rose-400/90 pl-5 truncate">
+                    Reason: {item.error}
+                  </div>
+                )}
               </div>
             ))}
           </div>

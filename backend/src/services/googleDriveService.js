@@ -12,6 +12,7 @@ class GoogleDriveService {
     this.oauth2Client = null;
     this.rootFolderId = null;
     this._initialized = false;
+    this.folderCache = new Map();
   }
 
   isConfigured() {
@@ -116,6 +117,11 @@ class GoogleDriveService {
   }
 
   async findFolder(name, parentFolderId) {
+    const cacheKey = `${parentFolderId}::${name}`;
+    if (this.folderCache.has(cacheKey)) {
+      return this.folderCache.get(cacheKey);
+    }
+
     const drive = this.initialize();
     if (!drive) return null;
 
@@ -133,7 +139,9 @@ class GoogleDriveService {
     });
 
     if (res.data.files && res.data.files.length > 0) {
-      return res.data.files[0].id;
+      const folderId = res.data.files[0].id;
+      this.folderCache.set(cacheKey, folderId);
+      return folderId;
     }
     return null;
   }
@@ -155,7 +163,14 @@ class GoogleDriveService {
       fields: 'id, name',
     });
 
-    return res.data.id;
+    const folderId = res.data.id;
+    const cacheKey = `${parentFolderId}::${name}`;
+    this.folderCache.set(cacheKey, folderId);
+    return folderId;
+  }
+
+  getRootFolderId() {
+    return this.rootFolderId || process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
   }
 
   async ensureFolder(name, parentFolderId) {
@@ -165,7 +180,8 @@ class GoogleDriveService {
   }
 
   async ensureMangaFolder(mangaSlug) {
-    const rootId = this.rootFolderId;
+    this.initialize();
+    const rootId = this.getRootFolderId();
     if (!rootId) {
       throw new Error('GOOGLE_DRIVE_ROOT_FOLDER_ID is not configured');
     }
@@ -192,6 +208,7 @@ class GoogleDriveService {
   }
 
   async ensureChapterFolder(mangaSlug, chapterNumber) {
+    this.initialize();
     const { chaptersFolderId } = await this.ensureMangaFolder(mangaSlug);
     const chapterFolderName = `chapter-${String(chapterNumber).padStart(3, '0')}`;
     const chapterFolderId = await this.ensureFolder(chapterFolderName, chaptersFolderId);
